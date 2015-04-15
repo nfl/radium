@@ -66,7 +66,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 1 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var merge = __webpack_require__(8);
+	var merge = __webpack_require__(9);
 
 	var StyleResolverMixin = {
 	  _getStateStyles: function (states, component) {
@@ -315,10 +315,10 @@ return /******/ (function(modules) { // webpackBootstrap
 /***/ function(module, exports, __webpack_require__) {
 
 	var React = __webpack_require__(6);
-	var debounce = __webpack_require__(9);
+	var debounce = __webpack_require__(8);
 
 	var matchers = {};
-	var matchedQueries = {};
+	var matchedQueries;
 
 	var mediaChangeCallback;
 
@@ -338,49 +338,58 @@ return /******/ (function(modules) { // webpackBootstrap
 	  },
 
 	  init: function (mediaQueryOpts) {
-	    if (!mediaQueryOpts || typeof window === 'undefined') {
+	    if (!mediaQueryOpts) {
 	      return;
 	    }
 
 	    Object.keys(mediaQueryOpts).forEach(function (key) {
-	      matchers[key] = window.matchMedia(mediaQueryOpts[key]);
-	      matchers[key].addListener(onMediaChange);
+	      matchers[key] = (typeof window === 'undefined') ? {
+	        matches: false,
+	        media: mediaQueryOpts[key]
+	      } : window.matchMedia(mediaQueryOpts[key]);
+	      if (matchers[key].addListener) {
+	        matchers[key].addListener(onMediaChange);
+	      }
 	    });
 	  },
 
 	  componentWillMount: function () {
 	    mediaChangeCallback = this.handleMediaChange;
-	    mediaChangeCallback();
 	  },
 
 	  componentWillUnmount: function () {
 	    mediaChangeCallback = null;
 
-	    if (!matchers) {
-	      return;
-	    }
-
 	    Object.keys(matchers).forEach(function (key) {
-	      matchers[key].removeListener(onMediaChange);
+	      if (matchers[key].removeListener) {
+	        matchers[key].removeListener(onMediaChange);
+	      }
 	    });
 	  },
 
 	  getMatchedMedia: function () {
-	    return matchedQueries;
+	    return matchedQueries || this._updateMatchedMedia();
 	  },
 
 	  handleMediaChange: debounce(function () {
+	    this._updateMatchedMedia();
+	    this.forceUpdate();
+	  }, 10, {
+	    maxWait: 250
+	  }),
+
+	  _updateMatchedMedia: function () {
 	    Object.keys(matchers).forEach(function (key) {
+	      if (!matchedQueries) {
+	        matchedQueries = {};
+	      }
 	      matchedQueries[key] = {
 	        matches: matchers[key].matches,
 	        media: matchers[key].media
 	      };
 	    });
-
-	    this.forceUpdate();
-	  }, 10, {
-	    maxWait: 250
-	  })
+	    return matchedQueries;
+	  }
 	};
 
 	module.exports = MatchMediaBase;
@@ -548,66 +557,6 @@ return /******/ (function(modules) { // webpackBootstrap
 
 /***/ },
 /* 8 */
-/***/ function(module, exports, __webpack_require__) {
-
-	var baseMerge = __webpack_require__(12),
-	    createAssigner = __webpack_require__(13);
-
-	/**
-	 * Recursively merges own enumerable properties of the source object(s), that
-	 * don't resolve to `undefined` into the destination object. Subsequent sources
-	 * overwrite property assignments of previous sources. If `customizer` is
-	 * provided it is invoked to produce the merged values of the destination and
-	 * source properties. If `customizer` returns `undefined` merging is handled
-	 * by the method instead. The `customizer` is bound to `thisArg` and invoked
-	 * with five arguments: (objectValue, sourceValue, key, object, source).
-	 *
-	 * @static
-	 * @memberOf _
-	 * @category Object
-	 * @param {Object} object The destination object.
-	 * @param {...Object} [sources] The source objects.
-	 * @param {Function} [customizer] The function to customize merging properties.
-	 * @param {*} [thisArg] The `this` binding of `customizer`.
-	 * @returns {Object} Returns `object`.
-	 * @example
-	 *
-	 * var users = {
-	 *   'data': [{ 'user': 'barney' }, { 'user': 'fred' }]
-	 * };
-	 *
-	 * var ages = {
-	 *   'data': [{ 'age': 36 }, { 'age': 40 }]
-	 * };
-	 *
-	 * _.merge(users, ages);
-	 * // => { 'data': [{ 'user': 'barney', 'age': 36 }, { 'user': 'fred', 'age': 40 }] }
-	 *
-	 * // using a customizer callback
-	 * var object = {
-	 *   'fruits': ['apple'],
-	 *   'vegetables': ['beet']
-	 * };
-	 *
-	 * var other = {
-	 *   'fruits': ['banana'],
-	 *   'vegetables': ['carrot']
-	 * };
-	 *
-	 * _.merge(object, other, function(a, b) {
-	 *   if (_.isArray(a)) {
-	 *     return a.concat(b);
-	 *   }
-	 * });
-	 * // => { 'fruits': ['apple', 'banana'], 'vegetables': ['beet', 'carrot'] }
-	 */
-	var merge = createAssigner(baseMerge);
-
-	module.exports = merge;
-
-
-/***/ },
-/* 9 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var isObject = __webpack_require__(14),
@@ -796,6 +745,66 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 
 	module.exports = debounce;
+
+
+/***/ },
+/* 9 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var baseMerge = __webpack_require__(12),
+	    createAssigner = __webpack_require__(13);
+
+	/**
+	 * Recursively merges own enumerable properties of the source object(s), that
+	 * don't resolve to `undefined` into the destination object. Subsequent sources
+	 * overwrite property assignments of previous sources. If `customizer` is
+	 * provided it is invoked to produce the merged values of the destination and
+	 * source properties. If `customizer` returns `undefined` merging is handled
+	 * by the method instead. The `customizer` is bound to `thisArg` and invoked
+	 * with five arguments: (objectValue, sourceValue, key, object, source).
+	 *
+	 * @static
+	 * @memberOf _
+	 * @category Object
+	 * @param {Object} object The destination object.
+	 * @param {...Object} [sources] The source objects.
+	 * @param {Function} [customizer] The function to customize merging properties.
+	 * @param {*} [thisArg] The `this` binding of `customizer`.
+	 * @returns {Object} Returns `object`.
+	 * @example
+	 *
+	 * var users = {
+	 *   'data': [{ 'user': 'barney' }, { 'user': 'fred' }]
+	 * };
+	 *
+	 * var ages = {
+	 *   'data': [{ 'age': 36 }, { 'age': 40 }]
+	 * };
+	 *
+	 * _.merge(users, ages);
+	 * // => { 'data': [{ 'user': 'barney', 'age': 36 }, { 'user': 'fred', 'age': 40 }] }
+	 *
+	 * // using a customizer callback
+	 * var object = {
+	 *   'fruits': ['apple'],
+	 *   'vegetables': ['beet']
+	 * };
+	 *
+	 * var other = {
+	 *   'fruits': ['banana'],
+	 *   'vegetables': ['carrot']
+	 * };
+	 *
+	 * _.merge(object, other, function(a, b) {
+	 *   if (_.isArray(a)) {
+	 *     return a.concat(b);
+	 *   }
+	 * });
+	 * // => { 'fruits': ['apple', 'banana'], 'vegetables': ['beet', 'carrot'] }
+	 */
+	var merge = createAssigner(baseMerge);
+
+	module.exports = merge;
 
 
 /***/ },
@@ -2161,7 +2170,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /***/ function(module, exports, __webpack_require__) {
 
 	var isLength = __webpack_require__(31),
-	    toObject = __webpack_require__(51);
+	    toObject = __webpack_require__(54);
 
 	/**
 	 * Creates a `baseEach` or `baseEachRight` function.
@@ -2196,9 +2205,9 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 37 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseMatches = __webpack_require__(52),
-	    baseMatchesProperty = __webpack_require__(53),
-	    baseProperty = __webpack_require__(54),
+	var baseMatches = __webpack_require__(51),
+	    baseMatchesProperty = __webpack_require__(52),
+	    baseProperty = __webpack_require__(53),
 	    bindCallback = __webpack_require__(34),
 	    identity = __webpack_require__(49);
 
@@ -2741,31 +2750,11 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 51 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var isObject = __webpack_require__(14);
-
-	/**
-	 * Converts `value` to an object if it is not one.
-	 *
-	 * @private
-	 * @param {*} value The value to process.
-	 * @returns {Object} Returns the object.
-	 */
-	function toObject(value) {
-	  return isObject(value) ? value : Object(value);
-	}
-
-	module.exports = toObject;
-
-
-/***/ },
-/* 52 */
-/***/ function(module, exports, __webpack_require__) {
-
 	var baseIsMatch = __webpack_require__(61),
 	    constant = __webpack_require__(62),
 	    isStrictComparable = __webpack_require__(63),
 	    keys = __webpack_require__(44),
-	    toObject = __webpack_require__(51);
+	    toObject = __webpack_require__(54);
 
 	/**
 	 * The base implementation of `_.matches` which does not clone `source`.
@@ -2809,12 +2798,12 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 53 */
+/* 52 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var baseIsEqual = __webpack_require__(64),
 	    isStrictComparable = __webpack_require__(63),
-	    toObject = __webpack_require__(51);
+	    toObject = __webpack_require__(54);
 
 	/**
 	 * The base implementation of `_.matchesProperty` which does not coerce `key`
@@ -2841,7 +2830,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 54 */
+/* 53 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/**
@@ -2858,6 +2847,26 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 
 	module.exports = baseProperty;
+
+
+/***/ },
+/* 54 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var isObject = __webpack_require__(14);
+
+	/**
+	 * Converts `value` to an object if it is not one.
+	 *
+	 * @private
+	 * @param {*} value The value to process.
+	 * @returns {Object} Returns the object.
+	 */
+	function toObject(value) {
+	  return isObject(value) ? value : Object(value);
+	}
+
+	module.exports = toObject;
 
 
 /***/ },
@@ -2902,7 +2911,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 56 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var toObject = __webpack_require__(51);
+	var toObject = __webpack_require__(54);
 
 	/**
 	 * Creates a base function for `_.forIn` or `_.forInRight`.
@@ -2940,7 +2949,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    isIndex = __webpack_require__(50),
 	    isLength = __webpack_require__(31),
 	    keysIn = __webpack_require__(60),
-	    support = __webpack_require__(66);
+	    support = __webpack_require__(67);
 
 	/** Used for native method references. */
 	var objectProto = Object.prototype;
@@ -2983,7 +2992,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 58 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var baseForIn = __webpack_require__(67),
+	var baseForIn = __webpack_require__(66),
 	    isObjectLike = __webpack_require__(32);
 
 	/** `Object#toString` result references. */
@@ -3075,7 +3084,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    isIndex = __webpack_require__(50),
 	    isLength = __webpack_require__(31),
 	    isObject = __webpack_require__(14),
-	    support = __webpack_require__(66);
+	    support = __webpack_require__(67);
 
 	/** Used for native method references. */
 	var objectProto = Object.prototype;
@@ -3308,6 +3317,29 @@ return /******/ (function(modules) { // webpackBootstrap
 /* 66 */
 /***/ function(module, exports, __webpack_require__) {
 
+	var baseFor = __webpack_require__(43),
+	    keysIn = __webpack_require__(60);
+
+	/**
+	 * The base implementation of `_.forIn` without support for callback
+	 * shorthands and `this` binding.
+	 *
+	 * @private
+	 * @param {Object} object The object to iterate over.
+	 * @param {Function} iteratee The function invoked per iteration.
+	 * @returns {Object} Returns `object`.
+	 */
+	function baseForIn(object, iteratee) {
+	  return baseFor(object, iteratee, keysIn);
+	}
+
+	module.exports = baseForIn;
+
+
+/***/ },
+/* 67 */
+/***/ function(module, exports, __webpack_require__) {
+
 	/* WEBPACK VAR INJECTION */(function(global) {/** Used for native method references. */
 	var objectProto = Object.prototype;
 
@@ -3380,29 +3412,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = support;
 
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
-
-/***/ },
-/* 67 */
-/***/ function(module, exports, __webpack_require__) {
-
-	var baseFor = __webpack_require__(43),
-	    keysIn = __webpack_require__(60);
-
-	/**
-	 * The base implementation of `_.forIn` without support for callback
-	 * shorthands and `this` binding.
-	 *
-	 * @private
-	 * @param {Object} object The object to iterate over.
-	 * @param {Function} iteratee The function invoked per iteration.
-	 * @returns {Object} Returns `object`.
-	 */
-	function baseForIn(object, iteratee) {
-	  return baseFor(object, iteratee, keysIn);
-	}
-
-	module.exports = baseForIn;
-
 
 /***/ },
 /* 68 */
